@@ -7,3 +7,5 @@ moviepy
 requests
 google-cloud-aiplatform
 google-cloud-storage
+scipy
+numpy

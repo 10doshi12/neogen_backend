@@ -3,6 +3,7 @@ import uuid
 import os
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from schemas import VideoRequest
 from services import ai_service, video_service
 from config import BASE_TEMP_DIR
@@ -12,6 +13,15 @@ app = FastAPI(
     description="Generates a video from a text prompt asynchronously.",
 )
 
+# Add CORS middleware to allow requests from React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],  # React dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # --- Task Status "Database" ---
 # This global dictionary will store the status of each task.
 # In production, you'd replace this with a database (like Redis or Postgres).
@@ -19,24 +29,31 @@ task_statuses = {}
 
 # --- The Background Worker Function ---
 
-def run_video_generation(task_id: str, prompt: str):
+def run_video_generation(task_id: str, prompt: str, duration_seconds: int = 20, orientation: str = "horizontal"):
     """
     This is the long-running function that runs in the background.
     It updates the task_statuses dictionary as it progresses.
+    
+    Args:
+        task_id: Unique identifier for this video generation task
+        prompt: The user's video prompt
+        prompt: The user's video prompt
+        duration_seconds: The exact total duration for the video (default: 20)
+        orientation: Video orientation ("horizontal" or "vertical")
     """
     try:
         # 1. Update status
-        task_statuses[task_id] = {"status": "generating_script", "message": "Generating script..."}
+        task_statuses[task_id] = {"status": "generating_script", "message": f"Generating script for {duration_seconds} second video ({orientation})..."}
         
-        # 2. Generate script
-        script = ai_service.generate_script(prompt)
+        # 2. Generate script with the specified duration
+        script = ai_service.generate_script(prompt, total_duration_seconds=duration_seconds)
         
         # 3. Update status
         task_statuses[task_id] = {"status": "generating_video", "message": "Script complete. Generating video..."}
         
         # 4. Create video (This is the long part)
         # We pass the task_id to video_service for file organization
-        video_path = video_service.create_video(script, task_id)
+        video_path = video_service.create_video(script, task_id, orientation)
         
         # 5. Update status to "complete"
         final_file_path = os.path.relpath(video_path, BASE_TEMP_DIR)
@@ -70,7 +87,9 @@ async def generate_video_endpoint(request: VideoRequest, background_tasks: Backg
     background_tasks.add_task(
         run_video_generation, 
         task_id, 
-        request.prompt
+        request.prompt,
+        request.video_length_seconds,
+        request.orientation
     )
     
     # 4. Return immediately with the task_id

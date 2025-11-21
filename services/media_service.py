@@ -5,17 +5,26 @@ import time
 # Import our new rotator from config
 from config import pexels_key_rotator, BASE_TEMP_DIR 
 
-def get_stock_video(query: str, output_path: str) -> str:
+def get_stock_video(query: str, output_path: str, orientation: str = "horizontal") -> str:
     """
     Searches Pexels for a video using the direct API, downloads it,
     and saves it to output_path.
     
-    This function combines the logic you provided.
+    Args:
+        query: Search query
+        output_path: Path to save the video
+        orientation: "horizontal" (16:9) or "vertical" (9:16)
     """
+    
+    # Map our orientation to Pexels orientation
+    # Pexels supports: landscape, portrait, square
+    pexels_orientation = "landscape"
+    if orientation == "vertical":
+        pexels_orientation = "portrait"
     
     # --- Part 1: Search for Video (Your 'search_for_video' logic) ---
     search_url = "https://api.pexels.com/videos/search"
-    params = { "query": query, "per_page": 10, "orientation": "landscape" }
+    params = { "query": query, "per_page": 10, "orientation": pexels_orientation }
     max_retries = len(pexels_key_rotator.api_keys)
     video_url = None
     
